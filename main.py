@@ -54,10 +54,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(application: FastAPI):
-        active = configured or Settings.from_env()
-        application.state.settings = active
-        application.state.replays = ReplayLedger(active.replay_db_path)
-        application.state.rate_window = RateWindow(active.rate_limit_per_minute, deque(), asyncio.Lock())
+        application.state.settings = None
+        application.state.replays = None
+        application.state.rate_window = None
+        application.state.configuration_status = "invalid"
+        try:
+            active = configured or Settings.from_env()
+            application.state.settings = active
+            application.state.replays = ReplayLedger(active.replay_db_path)
+            application.state.rate_window = RateWindow(active.rate_limit_per_minute, deque(), asyncio.Lock())
+            application.state.configuration_status = "ready"
+            print("[dark-agent-sandbox] startup ready", flush=True)
+        except Exception as error:
+            print(
+                f"[dark-agent-sandbox] startup locked: {type(error).__name__}",
+                flush=True,
+            )
         yield
 
     app = FastAPI(
@@ -78,9 +90,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         response.headers["Referrer-Policy"] = "no-referrer"
         return response
 
+    @app.get("/")
     @app.get("/healthz")
     async def healthz():
-        return {"status": "ok", "protocol": "dark-agent-tool-v1", "tools": ["web_search"]}
+        return {
+            "status": "ok",
+            "protocol": "dark-agent-tool-v1",
+            "configuration": app.state.configuration_status,
+            "tools": ["web_search"],
+        }
 
     @app.post("/v1/execute")
     async def execute(
@@ -91,7 +109,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         x_dark_agent_tool: str | None = Header(default=None),
         x_dark_agent_signature: str | None = Header(default=None),
     ):
-        settings: Settings = request.app.state.settings
+        settings: Settings | None = request.app.state.settings
+        if settings is None:
+            return _error(503, "sandbox configuration is unavailable")
         content_length = request.headers.get("content-length")
         if content_length and (not content_length.isdigit() or int(content_length) > settings.request_limit_bytes):
             return _error(413, "request exceeds the sandbox byte limit")
