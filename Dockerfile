@@ -20,4 +20,4 @@ USER sandbox
 EXPOSE 8080
 
 # Start the application using Uvicorn, targeting main.py in the root
-CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD python -m uvicorn main:app --host 0.0.0.0 --port $PORT
