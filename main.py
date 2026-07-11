@@ -130,7 +130,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             result = await search_web(
                 query=search_input.query,
                 max_results=search_input.maxResults,
-                api_key=settings.brave_search_api_key,
+                api_key=settings.firecrawl_api_key, # Typo fixed here!
                 response_limit_bytes=settings.provider_response_limit_bytes,
             )
         except ValueError:
