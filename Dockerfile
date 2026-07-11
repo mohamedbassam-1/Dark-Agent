@@ -7,9 +7,9 @@ WORKDIR /service
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Setup the folder structure so Python can find your files
+# Setup the folder structure so Python can find ALL your files
 RUN mkdir app
-COPY main.py search.py config.py security.py ./app/
+COPY *.py ./app/
 RUN touch ./app/__init__.py
 
 RUN chown -R sandbox:sandbox /service
