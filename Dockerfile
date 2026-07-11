@@ -1,19 +1,23 @@
-FROM python:3.12-slim AS runtime
+FROM python:3.12-slim
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
-
+# Create a non-root system user for safety
 RUN useradd --create-home --uid 10001 sandbox
+
 WORKDIR /service
 
-COPY requirements.lock ./
-RUN pip install --no-cache-dir --requirement requirements.lock
+# Copy dependency list and install them globally in the container
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app ./app
+# Copy all application files directly from your root directory
+COPY main.py search.py config.py ./
+
+# Adjust file ownership to the sandbox user
 RUN chown -R sandbox:sandbox /service
+
 USER sandbox
 
 EXPOSE 8080
-HEALTHCHECK --interval=30s --timeout=3s --retries=3 CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=2).read()"]
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1", "--no-access-log", "--no-proxy-headers"]
+
+# Start the application using Uvicorn, targeting main.py in the root
+CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
