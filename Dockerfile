@@ -1,23 +1,19 @@
 FROM python:3.12-slim
 
-# Create a non-root system user for safety
 RUN useradd --create-home --uid 10001 sandbox
-
 WORKDIR /service
 
-# Copy dependency list and install them globally in the container
+# Install dependencies
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy all application files directly from your root directory
-COPY main.py search.py config.py ./
+# Setup the folder structure so Python can find your files
+RUN mkdir app
+COPY main.py search.py config.py security.py ./app/
+RUN touch ./app/__init__.py
 
-# Adjust file ownership to the sandbox user
 RUN chown -R sandbox:sandbox /service
-
 USER sandbox
 
 EXPOSE 8080
-
-# Start the application using Uvicorn, targeting main.py in the root
-CMD python -m uvicorn main:app --host 0.0.0.0 --port $PORT
+CMD python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
