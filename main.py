@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import time
 from collections import deque
 from contextlib import asynccontextmanager
@@ -16,6 +17,9 @@ from .config import Settings
 from .replay import ReplayLedger
 from .search import SearchProviderError, search_web
 from .security import AuthenticationError, verify_signed_request
+
+
+DIAGNOSTIC_BUILD = "pandastack-env-v2"
 
 
 class SearchInput(BaseModel):
@@ -58,14 +62,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         application.state.replays = None
         application.state.rate_window = None
         application.state.configuration_status = "invalid"
+        application.state.configuration_checks = _configuration_checks()
         try:
             active = configured or Settings.from_env()
             application.state.settings = active
             application.state.replays = ReplayLedger(active.replay_db_path)
             application.state.rate_window = RateWindow(active.rate_limit_per_minute, deque(), asyncio.Lock())
             application.state.configuration_status = "ready"
+            application.state.configuration_checks["replayDatabase"] = "ready"
             print("[dark-agent-sandbox] startup ready", flush=True)
         except Exception as error:
+            if application.state.configuration_checks["replayDatabase"] == "not_checked":
+                prerequisites_ready = (
+                    application.state.configuration_checks["toolSandboxToken"] == "valid"
+                    and application.state.configuration_checks["firecrawlApiKey"] == "present"
+                )
+                application.state.configuration_checks["replayDatabase"] = "error" if prerequisites_ready else "skipped"
             print(
                 f"[dark-agent-sandbox] startup locked: {type(error).__name__}",
                 flush=True,
@@ -96,7 +108,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return {
             "status": "ok",
             "protocol": "dark-agent-tool-v1",
+            "build": DIAGNOSTIC_BUILD,
             "configuration": app.state.configuration_status,
+            "checks": app.state.configuration_checks,
             "tools": ["web_search"],
         }
 
@@ -169,6 +183,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
 def _error(status: int, message: str) -> JSONResponse:
     return JSONResponse(status_code=status, content={"error": message})
+
+
+def _configuration_checks() -> dict[str, str]:
+    token = os.environ.get("TOOL_SANDBOX_TOKEN", "").strip()
+    firecrawl_key = os.environ.get("FIRECRAWL_API_KEY", "").strip()
+    if not token:
+        token_status = "missing"
+    elif len(token) < 32:
+        token_status = "too_short"
+    elif len(token) > 4_096:
+        token_status = "too_long"
+    else:
+        token_status = "valid"
+    return {
+        "toolSandboxToken": token_status,
+        "firecrawlApiKey": "present" if firecrawl_key else "missing",
+        "replayDatabase": "not_checked",
+    }
 
 
 async def _read_bounded_body(request: Request, maximum: int) -> bytes | None:
