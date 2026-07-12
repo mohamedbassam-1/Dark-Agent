@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import os
-from dotenv import load_dotenv # Add this
-load_dotenv()                  # Add this
+from dotenv import load_dotenv
+load_dotenv()
 import asyncio
 import json
 import time
@@ -113,8 +113,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "build": DIAGNOSTIC_BUILD,
             "configuration": app.state.configuration_status,
             "checks": app.state.configuration_checks,
-            "tools": ["web_search"],
-            "debug_env_keys": list(os.environ.keys()) # <-- The diagnostic line is added here
+            "tools": ["web_search"]
         }
 
     @app.post("/v1/execute")
