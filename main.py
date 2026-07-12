@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+from dotenv import load_dotenv # Add this
+load_dotenv()                  # Add this
 import time
 from collections import deque
 from contextlib import asynccontextmanager
