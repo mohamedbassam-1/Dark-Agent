@@ -114,6 +114,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "configuration": app.state.configuration_status,
             "checks": app.state.configuration_checks,
             "tools": ["web_search"],
+            "debug_env_keys": list(os.environ.keys()) # <-- The diagnostic line is added here
         }
 
     @app.post("/v1/execute")
